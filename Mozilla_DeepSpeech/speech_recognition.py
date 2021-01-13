@@ -7,7 +7,7 @@ import tkinter as tk
 import time
 import threading
 import os
-
+from datetime import datetime
 import subprocess, platform
 from google_trans_new import google_translator
 import arabic_reshaper
@@ -26,29 +26,43 @@ class Speech_Recognition:
 		self.progress = ttk.Progressbar(self.frame, orient = HORIZONTAL,length = 800, mode = 'indeterminate')
 
 		Button(self.frame,text="Download",command=self.run).place(x=0,y=17)
-		Button(self.frame,text="Open",padx=27,command=self.open).place(x=0,y=50)
-		self.path=Entry(self.frame,font=("time",10,"italic"),width=85)
-		self.path.place(x=95,y=55)
+		var_1 =IntVar()
+		var_1.set(1)
+
+		r1=Radiobutton(self.frame,text="Batching",indicatoron=0,variable=var_1,value=1,command=self.batching)
+		r2=Radiobutton(self.frame,text="Streaming",indicatoron=0,variable=var_1,value=2,command=self.streaming)
+		self.speak=Button(self.frame,text="Start Speaking",command=self.start_speaking)
+		r1.place(x=300,y=70)
+		r2.place(x=400,y=70)
+		self.speak.place(x=350,y=190)
+		self.speak.place_forget()
+		self.open_file=Button(self.frame,text="Open",padx=27,command=self.open)
+		self.open_file.place(x=0,y=90)
+		self.path=Entry(self.frame,font=("time",10,"italic"),width=105)
+		self.path.place(x=95,y=95)
 		self.path.insert(0,os.path.abspath(os.getcwd()))
 		self.title=Label(self.frame,text=" ",font=("time",8,"normal"))
-		self.title.place(x=100,y=90)
-		Label(self.frame,text="File name:").place(x=0,y=90)
+		self.title.place(x=100,y=140)
+		self.file_name=Label(self.frame,text="File name:")
+		self.file_name.place(x=0,y=140)
 		self.conv2wav=Button(self.frame,text="convert 2 wav",command=self.conv_2_wav)
-		self.conv2wav.place(x=660,y=90)
+		self.conv2wav.place(x=660,y=140)
 		self.conv2wav["state"]="disable"
+		
 		self.extract=Button(self.frame,text="Extract",padx=23,command=self.extract_subtitles)
-		self.extract.place(x=150,y=150)
+		self.extract.place(x=150,y=190)
 		self.extract["state"]="disable"
 		self.translate=Button(self.frame,text="Translate",command=self.translate)
-		self.translate.place(x=550,y=150)
-		canvas_1.create_line(0,125,600,125,dash=(4,2))
+		self.translate["state"]="disable"
+		self.translate.place(x=550,y=190)
+		canvas_1.create_line(0,150,600,150,dash=(4,2))
 		canvas_1.pack()
-		f_1=LabelFrame(self.frame,text="Subtitles",width=400,height=520)
-		f_1.place(x=1,y=180)
-		f_2=LabelFrame(self.frame,text="Translated",width=395,height=520)
-		f_2.place(x=405,y=180)
-		self.subtitles = scrolledtext.ScrolledText(f_1, wrap = tk.WORD, bg="black",fg="green",width = 37, height = 21, font = ("Times New Roman",15)) 
-		self.translated = scrolledtext.ScrolledText(f_2, wrap = tk.WORD,bg="black",fg="green", width = 37, height = 21, font = ("Times New Roman",15))
+		f_1=LabelFrame(self.frame,text="Subtitles",width=400,height=500)
+		f_1.place(x=1,y=220)
+		f_2=LabelFrame(self.frame,text="Translated",width=395,height=500)
+		f_2.place(x=405,y=220)
+		self.subtitles = scrolledtext.ScrolledText(f_1, wrap = tk.WORD, bg="black",fg="green",width = 37, height = 20, font = ("Times New Roman",15)) 
+		self.translated = scrolledtext.ScrolledText(f_2, wrap = tk.WORD,bg="black",fg="green", width = 37, height = 20, font = ("Times New Roman",15))
 		
 		self.translated.tag_configure("tag-right",justify="right")
 		self.subtitles.place(x=0,y=0)
@@ -72,7 +86,45 @@ class Speech_Recognition:
 	def callback_select_all(self,event):
 
 		self.frame.after(50, lambda:event.widget.select_range(0, 'end'))
+	def batching(self):
+		self.open_file["state"]="active"
+		self.path["state"]="normal"
+		self.title["state"]="active"
+		self.file_name["state"]="active"
+		self.speak.place_forget()
+	def streaming(self):
+		self.open_file["state"]="disable"
+		self.path["state"]="disable"
+		self.title["state"]="disable"
+		self.file_name["state"]="disable"
+		self.speak.place(x=320,y=170)
+	def start_speaking(self):
+		now =datetime.now()
+		#self.dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+		self.dt_string="ehab"
+		t_1=threading.Thread(target=self.coincided_reading)
+		t_2=threading.Thread(target=self.listen)
+		t_1.start()
+		t_2.start()	
+	def listen(self):
+
+		f = open("{}.txt".format(self.dt_string), "w")
+		if platform.system() == 'Windows': 
+			subprocess.call(("python3","DeepSpeech-examples-r0.6\mic_vad_streaming\mic_vad_streaming.py","-m", "deepspeech-0.6.1-models\output_graph.pbmm", "-l", "deepspeech-0.6.1-models\lm.binary"),stdout=f)
+		else:
+			subprocess.call(("python3","DeepSpeech-examples-r0.6/mic_vad_streaming/mic_vad_streaming.py","-m", "deepspeech-0.6.1-models/output_graph.pbmm", "-l", "deepspeech-0.6.1-models/lm.binary"),stdout=f)
 		
+	def coincided_reading(self):
+		thefile=open("{}.txt".format(self.dt_string),'r') 
+		thefile.seek(0,2)
+		while True:
+			line = thefile.readline()
+			if not line:
+				time.sleep(0.1)
+				continue
+			#self.subtitles.delete("1.0",END)
+			self.subtitles.insert("0.0",line)	
+					
 	def show_textmenu(self,event):
 		e_widget = event.widget
 		self.m.entryconfigure("Cut",command=lambda: e_widget.event_generate("<<Cut>>"))
@@ -131,6 +183,7 @@ class Speech_Recognition:
 			self.subtitles.delete("1.0",END)
 			self.subtitles.insert("0.0",f.read())	
 			f.close()
+			
 	def run(self):
 		t1=threading.Thread(target=self.progress_bar)
 		t2=threading.Thread(target=self.download)
@@ -172,7 +225,9 @@ class Speech_Recognition:
 		if os.path.splitext(self.path.get())[1]==".mp4":
 			self.conv2wav["state"]="active"
 			self.extract["state"]="disable"
+			self.translate["state"]="disable"
 		else:
 			self.conv2wav["state"]="disable"
 			self.extract["state"]="active"
+			self.translate["state"]="active"
 sr=Speech_Recognition()
