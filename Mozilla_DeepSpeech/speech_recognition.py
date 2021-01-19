@@ -12,6 +12,10 @@ import subprocess, platform
 from google_trans_new import google_translator
 import arabic_reshaper
 from bidi.algorithm import get_display
+from gtts import gTTS
+from playsound import playsound
+from sys import exit
+import multiprocessing
 class Speech_Recognition:
 	def __init__(self):
 		self.frame=Tk()
@@ -28,14 +32,14 @@ class Speech_Recognition:
 		Button(self.frame,text="Download",command=self.run).place(x=0,y=17)
 		var_1 =IntVar()
 		var_1.set(1)
-
+		self.stop_flag=False
 		r1=Radiobutton(self.frame,text="Batching",indicatoron=0,variable=var_1,value=1,command=self.batching)
 		r2=Radiobutton(self.frame,text="Streaming",indicatoron=0,variable=var_1,value=2,command=self.streaming)
-		self.speak=Button(self.frame,text="Start Speaking",command=self.start_speaking)
+		self.listen=Button(self.frame,text="Start Listening",command=self.mainprocess)
 		r1.place(x=300,y=70)
 		r2.place(x=400,y=70)
-		self.speak.place(x=350,y=190)
-		self.speak.place_forget()
+		self.listen.place(x=350,y=190)
+		self.listen.place_forget()
 		self.open_file=Button(self.frame,text="Open",padx=27,command=self.open)
 		self.open_file.place(x=0,y=90)
 		self.path=Entry(self.frame,font=("time",10,"italic"),width=105)
@@ -91,40 +95,89 @@ class Speech_Recognition:
 		self.path["state"]="normal"
 		self.title["state"]="active"
 		self.file_name["state"]="active"
-		self.speak.place_forget()
+		self.listen.place_forget()
 	def streaming(self):
 		self.open_file["state"]="disable"
 		self.path["state"]="disable"
 		self.title["state"]="disable"
 		self.file_name["state"]="disable"
-		self.speak.place(x=320,y=170)
-	def start_speaking(self):
-		now =datetime.now()
-		#self.dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
-		self.dt_string="ehab"
+		self.listen.place(x=320,y=170)
+	def mainprocess(self):
+		self.p=multiprocessing.Process(target=self.start_listening,args=())
+		self.p.start()
+	def start_listening(self):
+		self.translated.delete("1.0",END)
+		self.subtitles.delete("1.0",END)
 		t_1=threading.Thread(target=self.coincided_reading)
-		t_2=threading.Thread(target=self.listen)
-		t_1.start()
-		t_2.start()	
-	def listen(self):
-
-		f = open("{}.txt".format(self.dt_string), "w")
-		if platform.system() == 'Windows': 
-			subprocess.call(("python3","DeepSpeech-examples-r0.6\mic_vad_streaming\mic_vad_streaming.py","-m", "deepspeech-0.6.1-models\output_graph.pbmm", "-l", "deepspeech-0.6.1-models\lm.binary"),stdout=f)
+		t_2=threading.Thread(target=self.listening)
+		
+		if self.stop_flag==True:
+			self.listen["text"]="Start Listening"
+			self.stop_flag=False
+			self.p.terminate()
+			
 		else:
-			subprocess.call(("python3","DeepSpeech-examples-r0.6/mic_vad_streaming/mic_vad_streaming.py","-m", "deepspeech-0.6.1-models/output_graph.pbmm", "-l", "deepspeech-0.6.1-models/lm.binary"),stdout=f)
+			now =datetime.now()
+			self.dt_string = now.strftime("%d.%m.%Y-%H:%M:%S")
+			self.listen["text"]="Stop Listening"
+			os.mkdir(self.dt_string)
+
+			t_2.start()
+			time.sleep(0.05)
+			t_1.start()
+	
+	def listening(self):
+
+
+		if platform.system() == 'Windows': 
+			f = open("{}\{}(en).txt".format(self.dt_string,self.dt_string), "a")
+			
+			subprocess.call(("python3","DeepSpeech-examples-r0.6\mic_vad_streaming\mic_vad_streaming.py","-m", "deepspeech-0.6.1-models\output_graph.pbmm", "-l", "deepspeech-0.6.1-models\lm.binary","-t","deepspeech-0.6.1-models\Tire","-w",self.dt_string),stdout=f)
+			
+		else:
+			
+			f = open("{}/{}(en).txt".format(self.dt_string,self.dt_string), "a")
+			audio='{}/{}(en).mp3'.format(self.dt_string,self.dt_string)
+			subprocess.call(("python3","DeepSpeech-examples-r0.6/mic_vad_streaming/mic_vad_streaming.py","-m", "deepspeech-0.6.1-models/output_graph.pbmm", "-l", "deepspeech-0.6.1-models/lm.binary","-t","deepspeech-0.6.1-models/Tire","-w",self.dt_string),stdout=f)
 		
 	def coincided_reading(self):
-		thefile=open("{}.txt".format(self.dt_string),'r') 
-		thefile.seek(0,2)
+		if platform.system()=="Windows":
+			enfile = open("{}\{}(en).txt".format(self.dt_string,self.dt_string), "r")
+			
+		else:
+			enfile = open("{}/{}(en).txt".format(self.dt_string,self.dt_string), "r")
+			
+		enfile.seek(0,2)
+		translator = google_translator()
+		i=0
 		while True:
-			line = thefile.readline()
+			if self.stop_flag==True:
+				break
+			line = enfile.readline()
 			if not line:
-				time.sleep(0.1)
+				time.sleep(0.05)
 				continue
-			#self.subtitles.delete("1.0",END)
 			self.subtitles.insert("0.0",line)	
-					
+
+			result=translator.translate(line,lang_tgt='ar')
+			result="\n" +result
+			result=arabic_reshaper.reshape(result)
+			self.translated.insert("1.0",result[::-1],"tag-right")
+			#ar_text=self.translated.get("1.0",END)
+			
+			sound = gTTS(text=result, lang="ar", slow=False)
+			if platform.system()=="Windows":
+				sound.save("{}\{}(ar).wav".format(self.dt_string,i))
+				playsound("{}\{}(ar).wav".format(self.dt_string,i)) 
+				arfile = open("{}\{}(ar).txt".format(self.dt_string,self.dt_string), "a")
+			else:
+				sound.save("{}/{}(ar).wav".format(self.dt_string,i))
+				playsound("{}/{}(ar).wav".format(self.dt_string,i))
+				arfile = open("{}/{}(ar).txt".format(self.dt_string,self.dt_string), "a")
+			arfile.write(result)
+			arfile.close() 
+			i=i+1
+						
 	def show_textmenu(self,event):
 		e_widget = event.widget
 		self.m.entryconfigure("Cut",command=lambda: e_widget.event_generate("<<Cut>>"))
