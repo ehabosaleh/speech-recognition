@@ -35,7 +35,7 @@ class Speech_Recognition:
 		self.stop_flag=False
 		r1=Radiobutton(self.frame,text="Batching",indicatoron=0,variable=var_1,value=1,command=self.batching)
 		r2=Radiobutton(self.frame,text="Streaming",indicatoron=0,variable=var_1,value=2,command=self.streaming)
-		self.listen=Button(self.frame,text="Start Listening",command=self.mainprocess)
+		self.listen=Button(self.frame,text="Start Listening",command=self.start_listening)
 		r1.place(x=300,y=70)
 		r2.place(x=400,y=70)
 		self.listen.place(x=350,y=190)
@@ -106,26 +106,42 @@ class Speech_Recognition:
 		self.p=multiprocessing.Process(target=self.start_listening,args=())
 		self.p.start()
 	def start_listening(self):
-		self.translated.delete("1.0",END)
-		self.subtitles.delete("1.0",END)
-		t_1=threading.Thread(target=self.coincided_reading)
-		t_2=threading.Thread(target=self.listening)
-		
-		if self.stop_flag==True:
-			self.listen["text"]="Start Listening"
-			self.stop_flag=False
-			self.p.terminate()
-			
-		else:
-			now =datetime.now()
-			self.dt_string = now.strftime("%d.%m.%Y-%H:%M:%S")
-			self.listen["text"]="Stop Listening"
-			os.mkdir(self.dt_string)
-
-			t_2.start()
-			time.sleep(0.05)
-			t_1.start()
 	
+			#self.translated.delete("1.0",END)
+			#self.subtitles.delete("1.0",END)
+			t_1=threading.Thread(target=self.coincided_reading)
+			t_2=threading.Thread(target=self.listening)
+			
+			if self.stop_flag==True:
+				self.listen["text"]="Start Listening"
+				self.stop_flag=False
+				if platform.system() == 'Windows': 
+			
+					subprocess.call(("echo","$'\cc'"))
+			
+				else:
+			
+					subprocess.call(("echo","$'\cc'", "|","./DeepSpeech-examples-r0.6/mic_vad_streaming/mic_vad_streaming.py"))
+				
+				 
+				
+			else:	
+				self.stop_flag=True
+				
+				now =datetime.now()
+				self.dt_string = now.strftime("%d.%m.%Y-%H:%M:%S")
+				self.listen["text"]="Stop Listening"
+				os.mkdir(self.dt_string)
+
+				t_2.start()
+				time.sleep(0.05)
+				t_1.start()
+
+
+			
+		
+			
+		
 	def listening(self):
 
 
